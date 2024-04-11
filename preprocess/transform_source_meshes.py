@@ -35,7 +35,8 @@ SOURCE_DICT = {
 }
 def save_transform(cate, mesh_path, scale):
     mesh_tmp = trimesh.load_mesh(mesh_path, file_type='obj', skip_materials=True)
-    model_size = np.linalg.norm(mesh_tmp.bounds[1] - mesh_tmp.bounds[0])
+    mesh_tmp = trimesh_scene_to_mesh(mesh_tmp)
+
     mesh_tmp.apply_scale(scale)
     if cate == 'mug':
         max_v = mesh_tmp.bounds[1]
@@ -58,8 +59,13 @@ def save_transform(cate, mesh_path, scale):
     rot = rot_dict[cate]
     trans2[:3,:3] = rot
     mesh_tmp.apply_transform(trans2)
+
+    radius_bbox = 2 * np.amax(abs(mesh_tmp.vertices), axis=0)
+    scale_ = np.linalg.norm(radius_bbox)
+    mesh_tmp.apply_scale(1 / scale_)
+
     os.makedirs('datasets/acronym/{}'.format(cate), exist_ok=True)
-    np.savez('datasets/acronym/{}/transform_matrix'.format(cate), RT=trans2 @ trans1, scale=1/(scale*model_size))
+    np.savez('datasets/acronym/{}/transform_matrix'.format(cate), RT=trans2 @ trans1, scale=1/scale_)
     return mesh_tmp
 
 def main():
@@ -76,8 +82,7 @@ def main():
     scale = float(grasp_file_name.split('_')[-1].rstrip('.h5'))
     obj_mesh = save_transform(args.category, mesh_file_path, scale)
     obj_mesh = trimesh_scene_to_mesh(obj_mesh)
-    norms = np.linalg.norm(obj_mesh.bounds[1] - obj_mesh.bounds[0])
-    obj_mesh.apply_scale(1 / norms)
+
     os.makedirs('datasets/obj/{}/train/{}'.format(args.category, obj_id), exist_ok=True)
     if not os.path.exists('datasets/obj/{}/train/{}/0.ply'.format(args.category, obj_id)):
         save_ply(obj_mesh.vertices, obj_mesh.faces, 'datasets/obj/{}/train/{}/0.ply'.format(args.category, obj_id))        
